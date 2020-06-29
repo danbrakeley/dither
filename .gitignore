@@ -1,0 +1,8 @@
+# editor settings
+/.vscode/
+
+# test images
+*.png
+
+# binary
+*.exe
