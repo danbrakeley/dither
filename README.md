@@ -2,13 +2,16 @@
 
 ## Overview
 
-Apply Bayer dithering to an image, for that classic "Windows 3.1 installer blue-gradient" look.
+Generate a dithered gradient.
+
+Trying to recreate the classic "Windows 3.1 Setup" look.
 
 ## Usage
 
 ```text
-dither [-f] <input.png|gif|jpg> <output.png>`
-  <input>  : existing image file in png, gif, or jpg format
-  <output> : image file to create/overwrite
-  -f       : force, aka skip confirmation prompt if output already exists
+usage: dither.exe <width>x<height> <rgb1> <rgb2> <num-colors> <output.png>
+  <width>x<height> : size of generated image
+  <rgb1>, <rgb2>   : colors to use for the gradient
+  <num-colors>     : how many colors to dither down to
+  <output.png>     : filename to create (will always be a png, regardless of the extension you try to give it)
 ```
