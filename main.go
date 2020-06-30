@@ -20,13 +20,24 @@ func main() {
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		}
-		fmt.Fprintf(os.Stderr, "usage: %s <width>x<height> <rgb1> <rgb2> <num-colors> <output.png>\n", filepath.Base(os.Args[0]))
-		fmt.Fprintf(os.Stderr, "example:\n        %s 320x240 0000FF 000000 16 winsetup.png\n", filepath.Base(os.Args[0]))
+		fmt.Fprintf(os.Stderr, "\n")
+		fmt.Fprintf(os.Stderr, "usage: %s <width>x<height> <rgb1> <rgb2> <num-colors> <smooth> <output.png>\n", filepath.Base(os.Args[0]))
+		fmt.Fprintf(os.Stderr, "\n")
+		fmt.Fprintf(os.Stderr, "       <width>: width of resulting image\n")
+		fmt.Fprintf(os.Stderr, "      <height>: height of resulting image\n")
+		fmt.Fprintf(os.Stderr, "        <rgb1>: top color of the gradient\n")
+		fmt.Fprintf(os.Stderr, "        <rgb2>: bottom color of the gradient\n")
+		fmt.Fprintf(os.Stderr, "  <num-colors>: number of colors in the palette to dither to\n")
+		fmt.Fprintf(os.Stderr, "      <smooth>: smoothing type, one of 'none', 'both', 'out'\n")
+		fmt.Fprintf(os.Stderr, "  <output.png>: file to write results to (contenst will be png, regardless of file extension)\n")
+		fmt.Fprintf(os.Stderr, "\n")
+		fmt.Fprintf(os.Stderr, "example:\n")
+		fmt.Fprintf(os.Stderr, "        %s 320x240 0000FF 000000 16 out winsetup.png\n", filepath.Base(os.Args[0]))
 		os.Exit(2)
 	}
 
-	if len(args) != 5 {
-		fnUsageAndQuit(fmt.Errorf("expected 5 args, got %d", len(args)))
+	if len(args) != 6 {
+		fnUsageAndQuit(fmt.Errorf("expected 6 args, got %d", len(args)))
 	}
 
 	width, height, err := ParseWidthXHeight(args[0])
@@ -44,18 +55,27 @@ func main() {
 		fnUsageAndQuit(fmt.Errorf("error parsing <rgb2>: %v", err))
 	}
 
-	var pal color.Palette
-
 	numColors, err := strconv.Atoi(args[3])
 	if err != nil {
 		fnUsageAndQuit(fmt.Errorf("error parsing <palette-size>: %v", err))
 	}
 
+	fnSmooth := NoSmoothing
+	switch args[4] {
+	case "none":
+		break
+	case "both":
+		fnSmooth = SmoothStepByte
+	case "out":
+		fnSmooth = SmoothStepByteOut
+	default:
+		fnUsageAndQuit(fmt.Errorf("invalid value for <smooth>"))
+	}
+
 	// create palette
+	var pal color.Palette = make([]color.Color, numColors)
 	for i := 0; i < numColors; i++ {
-		c := LerpRGB(c1, c2, uint8(i*255/(numColors-1)))
-		fmt.Printf("[%2d] %2x %2x %2x\n", i, c.R, c.G, c.B)
-		pal = append(pal, c)
+		pal[i] = LerpRGB(c1, c2, uint8(i*255/(numColors-1)))
 	}
 
 	// create outputimage
@@ -76,7 +96,7 @@ func main() {
 
 	for x := 0; x < width; x++ {
 		for y := 0; y < height; y++ {
-			c := LerpRGB(c1, c2, uint8(y*255/(height-1)))
+			c := LerpRGB(c1, c2, fnSmooth(uint8(y*255/(height-1))))
 			offset := m[x%4][y%4] - 7
 			c.R = ClampUint8(int(c.R) + offset)
 			c.G = ClampUint8(int(c.G) + offset)
@@ -85,15 +105,15 @@ func main() {
 		}
 	}
 
-	outFile, err := os.Create(args[4])
+	outFile, err := os.Create(args[5])
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error creating %s: %v\n", args[4], err)
+		fmt.Fprintf(os.Stderr, "error creating %s: %v\n", args[5], err)
 		os.Exit(1)
 	}
 	err = png.Encode(outFile, outImg)
 	outFile.Close()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error encoding %s: %v\n", args[4], err)
+		fmt.Fprintf(os.Stderr, "error encoding %s: %v\n", args[5], err)
 		os.Exit(1)
 	}
 }
@@ -161,4 +181,20 @@ func ClampUint8(n int) uint8 {
 		return 0
 	}
 	return uint8(n)
+}
+
+func NoSmoothing(x uint8) uint8 {
+	return x
+}
+
+func SmoothStepByte(x uint8) uint8 {
+	f := float64(x) / 255.0
+	f = f * f * (3 - 2*f)
+	return uint8(f * 255.0)
+}
+
+func SmoothStepByteOut(x uint8) uint8 {
+	f := (float64(x) / 510.0)
+	f = f * f * (3 - 2*f)
+	return uint8(f * 510.0)
 }
